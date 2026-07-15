@@ -195,4 +195,231 @@
         let maxDrawHeight = 100;
         let minDrawHeight = 0;
 
-        // 최대 지름
+        // 최대 지름 구하기 (몸체와 노즈콘 기준)
+        parts.forEach(p => {
+            if ((p.type === 'body' || p.type === 'nosecone') && p.diameter > maxDiameter) {
+                maxDiameter = p.diameter;
+            }
+        });
+
+        parts.forEach(p => {
+            // 1. CG (무게중심) 계산
+            let partCG = p.pos;
+            if (p.type === 'body') partCG = p.pos + (p.length / 2);
+            else if (p.type === 'nosecone') partCG = p.pos + (p.height * 0.4);
+            else if (p.type === 'fin') partCG = p.pos + (p.root_chord * 0.4); // 날개 기하학적 무게중심 근사
+            else if (p.type === 'motor') partCG = p.pos + (p.height / 2);
+            
+            totalWeight += p.weight;
+            weightedSumCG += (p.weight * partCG);
+
+            // 캔버스 렌더링 세팅용 높이 한계 측정
+            let topPos = p.pos + (p.length || p.height || p.root_chord || 0);
+            let bottomPos = p.pos;
+            if (topPos > maxDrawHeight) maxDrawHeight = topPos;
+            if (bottomPos < minDrawHeight) minDrawHeight = bottomPos;
+
+            // 2. CP (압력중심) 계산 - 바로우만(Barrowman) 방정식 반영
+            if (p.type === 'nosecone') {
+                let cN_nose = 2.0; // 원추형 노즈콘 공기역학 계수
+                let partCP = p.pos + (p.height * 0.466); 
+                cpNumerator += (cN_nose * partCP);
+                cpDenominator += cN_nose;
+            } else if (p.type === 'fin') {
+                const S = p.sweep;          // 후퇴 길이
+                const Cr = p.root_chord;    // 뿌리 길이
+                const Ct = p.tip_chord;     // 끝단 길이
+                const s = p.height;         // 날개 높이
+                const N = p.count;          // 날개 개수
+                const d = maxDiameter;      // 참조 지름 (최대 몸체 지름)
+                const R = d / 2;            // 몸체 반지름
+
+                const sum_C = (Cr + Ct) || 0.1;
+
+                // 간섭 효과 및 날개 고유 양력 계수 (Barrowman)
+                const interference = 1 + (R / (R + s));
+                const a = S + (Ct / 2) - (Cr / 2);
+                const Lc = Math.sqrt(a * a + s * s); // 중간 코드선 길이
+                const term = 1 + Math.sqrt(1 + Math.pow(2 * Lc / sum_C, 2));
+                const cN_fin = interference * (4 * N * Math.pow(s / d, 2)) / term;
+
+                // 날개 자체의 압력중심 거리 (앞단 기준 하단으로 내려가는 거리)
+                const X_f = (S / 3) * ((Cr + 2 * Ct) / sum_C) + (1 / 6) * (Cr + Ct - (Cr * Ct) / sum_C);
+                
+                // 바디튜브 하단(0) 기준의 날개 CP 좌표
+                const partCP = (p.pos + Cr) - X_f;
+
+                cpNumerator += (cN_fin * partCP);
+                cpDenominator += cN_fin;
+            }
+        });
+
+        // 최종 CG, CP 계산
+        const finalCG = totalWeight > 0 ? (weightedSumCG / totalWeight) : 0;
+        const finalCP = cpDenominator > 0 ? (cpNumerator / cpDenominator) : 0;
+        
+        // Caliber 계산 (바디튜브 하단 기준이므로 CG가 CP보다 높아야 양수가 나오며 안전함)
+        let caliber = 0;
+        if (maxDiameter > 0 && cpDenominator > 0) {
+            caliber = (finalCG - finalCP) / maxDiameter;
+        }
+
+        // 결과 인터페이스 업데이트
+        document.getElementById('valCG').innerText = finalCG.toFixed(1) + " mm";
+        document.getElementById('valCP').innerText = finalCP.toFixed(1) + " mm";
+        document.getElementById('valDia').innerText = maxDiameter.toFixed(1) + " mm";
+        document.getElementById('valCaliber').innerText = caliber.toFixed(2);
+
+        const statusAlert = document.getElementById('statusAlert');
+        if (parts.length === 0) {
+            statusAlert.className = 'status-unstable';
+            statusAlert.innerText = '부품을 추가하여 설계를 시작하세요.';
+        } else if (caliber < 1.0) {
+            statusAlert.className = 'status-unstable';
+            statusAlert.innerText = '⚠️ 불안정 (Unstable) - CG가 너무 낮거나 CP가 너무 높습니다. 날개 개수를 늘리거나 후퇴 길이를 늘려서 CP를 내리세요!';
+        } else if (caliber <= 2.0) {
+            statusAlert.className = 'status-stable';
+            statusAlert.innerText = '✅ 안정 (Stable) - 이상적인 비행 안정성을 유지하고 있습니다. 직진 비행에 적합합니다.';
+        } else {
+            statusAlert.className = 'status-overstable';
+            statusAlert.innerText = '⚠️ 과도안정 (Overstable) - 바람이 불면 바람이 불어오는 방향으로 급격히 꺾일 위험이 있습니다. (웨더코킹 현상)';
+        }
+
+        drawRocket(maxDrawHeight, minDrawHeight, finalCG, finalCP);
+    }
+
+    function drawRocket(maxH, minH, cg, cp) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        const rocketTotalHeight = maxH - minH + 50; 
+        const scale = Math.min((canvas.height - 50) / rocketTotalHeight, 1.8); 
+        const centerX = canvas.width / 2;
+        const baseCanvasY = canvas.height - 25 + (minH * scale); 
+
+        // 캔버스 Y좌표 역투영 함수 (로켓 위쪽 좌표가 높은 곳으로 매핑되도록)
+        const toCanvasY = (rocketY) => baseCanvasY - (rocketY * scale);
+
+        // 몸체 지름을 구하여 날개 그리기용 기준으로 삼음
+        const bodyTube = parts.find(p => p.type === 'body');
+        const bodyRadius = bodyTube ? (bodyTube.diameter / 2) : 15;
+
+        // 1. 모터 렌더링
+        parts.filter(p => p.type === 'motor').forEach(p => {
+            ctx.fillStyle = '#555';
+            const w = p.diameter * scale;
+            const h = p.height * scale;
+            ctx.fillRect(centerX - w/2, toCanvasY(p.pos + p.height), w, h);
+        });
+
+        // 2. 날개(Fin) 렌더링 (사다리꼴 날개 및 Sweep 완벽 시각화)
+        parts.filter(p => p.type === 'fin').forEach(p => {
+            ctx.fillStyle = '#007bff';
+            ctx.strokeStyle = '#0056b3';
+            ctx.lineWidth = 1.5;
+
+            const h = p.height * scale;
+            const Cr = p.root_chord * scale;
+            const Ct = p.tip_chord * scale;
+            const S = p.sweep * scale;
+            const bR = bodyRadius * scale;
+
+            // 로켓 하단 기준의 4개 정점 계산
+            const y_root_lead = toCanvasY(p.pos + p.root_chord);
+            const y_tip_lead = toCanvasY(p.pos + p.root_chord - p.sweep);
+            const y_tip_trail = toCanvasY(p.pos + p.root_chord - p.sweep - p.tip_chord);
+            const y_root_trail = toCanvasY(p.pos);
+
+            // 왼쪽 날개
+            ctx.beginPath();
+            ctx.moveTo(centerX - bR, y_root_lead);
+            ctx.lineTo(centerX - bR - h, y_tip_lead);
+            ctx.lineTo(centerX - bR - h, y_tip_trail);
+            ctx.lineTo(centerX - bR, y_root_trail);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            // 오른쪽 날개
+            ctx.beginPath();
+            ctx.moveTo(centerX + bR, y_root_lead);
+            ctx.lineTo(centerX + bR + h, y_tip_lead);
+            ctx.lineTo(centerX + bR + h, y_tip_trail);
+            ctx.lineTo(centerX + bR, y_root_trail);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+        });
+
+        // 3. 바디튜브 렌더링
+        parts.filter(p => p.type === 'body').forEach(p => {
+            ctx.fillStyle = '#f1f1f1';
+            ctx.strokeStyle = '#777';
+            ctx.lineWidth = 2;
+            const w = p.diameter * scale;
+            const h = p.length * scale;
+            ctx.fillRect(centerX - w/2, toCanvasY(p.pos + p.length), w, h);
+            ctx.strokeRect(centerX - w/2, toCanvasY(p.pos + p.length), w, h);
+        });
+
+        // 4. 노즈콘 렌더링
+        parts.filter(p => p.type === 'nosecone').forEach(p => {
+            ctx.fillStyle = '#dc3545';
+            const w = p.diameter * scale;
+            const h = p.height * scale;
+            const bottomY = toCanvasY(p.pos);
+            const topY = toCanvasY(p.pos + p.height);
+
+            ctx.beginPath();
+            ctx.moveTo(centerX - w/2, bottomY);
+            ctx.quadraticCurveTo(centerX - w/2, topY, centerX, topY);
+            ctx.quadraticCurveTo(centerX + w/2, topY, centerX + w/2, bottomY);
+            ctx.closePath();
+            ctx.fill();
+        });
+
+        // 마커 출력 헬퍼 함수
+        function drawMarker(y, color, label) {
+            const cy = toCanvasY(y);
+            ctx.beginPath();
+            ctx.arc(centerX, cy, 7, 0, Math.PI * 2);
+            ctx.fillStyle = color;
+            ctx.fill();
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // 크로스헤어 데코레이션
+            ctx.beginPath();
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 1;
+            ctx.moveTo(centerX - 10, cy); ctx.lineTo(centerX + 10, cy);
+            ctx.moveTo(centerX, cy - 10); ctx.lineTo(centerX, cy + 10);
+            ctx.stroke();
+
+            ctx.fillStyle = color;
+            ctx.font = 'bold 12px Arial';
+            ctx.fillText(label, centerX + 18, cy + 4);
+        }
+
+        // CG 마커 (파란색)
+        if (parts.length > 0) drawMarker(cg, '#0056b3', 'CG (무게중심)');
+        // CP 마커 (빨간색)
+        if (parts.length > 0) drawMarker(cp, '#c82333', 'CP (압력중심)');
+        
+        // 0mm 하단 가이드라인
+        ctx.strokeStyle = '#bbb';
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath();
+        ctx.moveTo(centerX - 80, baseCanvasY);
+        ctx.lineTo(centerX + 80, baseCanvasY);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        
+        ctx.fillStyle = '#666';
+        ctx.font = '11px Arial';
+        ctx.fillText("0mm (하단 기준선)", centerX + 85, baseCanvasY + 4);
+    }
+</script>
+
+</body>
+</html>
