@@ -3,421 +3,324 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>모형로켓 비행안전성 시뮬레이터 Pro</title>
+    <title>모형로켓 시뮬레이터 (사다리꼴 날개 및 개수 적용)</title>
     <style>
-        body { font-family: 'Malgun Gothic', sans-serif; background-color: #f4f7f6; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
-        .header { text-align: center; margin-bottom: 20px; }
-        .header h1 { color: #333; margin: 0 0 5px 0; }
-        .header p { color: #666; margin: 0; font-size: 14px; }
+        body { font-family: 'Malgun Gothic', sans-serif; background-color: #f0f4f8; margin: 0; padding: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 8px 16px rgba(0,0,0,0.1); display: flex; gap: 20px; }
+        .left-panel { flex: 1; max-height: 80vh; overflow-y: auto; padding-right: 10px; }
+        .right-panel { flex: 1; display: flex; flex-direction: column; gap: 20px; }
+        h1 { font-size: 24px; color: #333; margin-top: 0; border-bottom: 2px solid #007bff; padding-bottom: 10px; }
         
-        .main-container { display: flex; flex-direction: row; gap: 20px; width: 100%; max-width: 1250px; }
-        
-        /* 왼쪽: 컨트롤 패널 */
-        .controls { flex: 1.2; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); max-height: 85vh; overflow-y: auto; }
-        .add-panel { display: flex; gap: 10px; margin-bottom: 20px; padding-bottom: 20px; border-bottom: 2px solid #eee; }
-        select, button, input { padding: 8px; font-size: 14px; border: 1px solid #ccc; border-radius: 5px; }
-        button { background-color: #007bff; color: white; border: none; cursor: pointer; font-weight: bold; }
+        .control-group { margin-bottom: 15px; }
+        select, button, input { padding: 8px 12px; font-size: 14px; border: 1px solid #ccc; border-radius: 6px; }
+        button { background-color: #007bff; color: white; border: none; cursor: pointer; transition: 0.2s; font-weight: bold; }
         button:hover { background-color: #0056b3; }
         
-        .part-card { background: #f9f9f9; border: 1px solid #ddd; padding: 15px; margin-bottom: 15px; border-radius: 5px; position: relative; }
-        .part-card h3 { margin: 0 0 10px 0; color: #444; font-size: 16px; }
-        .remove-btn { position: absolute; top: 10px; right: 10px; background-color: #dc3545; padding: 4px 8px; font-size: 12px; }
-        .remove-btn:hover { background-color: #c82333; }
+        .part-card { background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 5px solid #007bff; padding: 15px; margin-bottom: 15px; border-radius: 6px; position: relative; }
+        .part-card h3 { margin: 0 0 10px 0; font-size: 16px; color: #222; }
+        .delete-btn { position: absolute; top: 12px; right: 12px; background: #dc3545; font-size: 12px; padding: 5px 10px; }
+        .delete-btn:hover { background: #b02a37; }
         
-        .input-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-        .input-group { display: flex; flex-direction: column; }
-        .input-group label { font-size: 11px; color: #555; margin-bottom: 3px; font-weight: bold; }
+        .input-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+        .input-item { display: flex; flex-direction: column; }
+        .input-item label { font-size: 12px; color: #555; margin-bottom: 4px; font-weight: 600; }
+        .input-item input { text-align: right; }
+
+        /* 특정 필드 강조 */
+        .highlight-label { color: #d63384 !important; }
+
+        .canvas-wrapper { background: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 10px; display: flex; justify-content: center; height: 450px; }
+        canvas { background-color: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+
+        .result-box { background: #e9ecef; padding: 20px; border-radius: 8px; text-align: center; }
+        .result-box h2 { margin: 0 0 15px 0; font-size: 20px; color: #333; }
+        .metrics { display: flex; justify-content: space-around; margin-bottom: 15px; }
+        .metric { font-size: 14px; color: #555; }
+        .metric span { display: block; font-size: 22px; font-weight: bold; color: #007bff; margin-top: 5px; }
         
-        /* 오른쪽: 시각화 및 결과 패널 */
-        .visualization { flex: 1; display: flex; flex-direction: column; gap: 20px; }
-        .canvas-container { background: white; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); padding: 20px; display: flex; justify-content: center; align-items: center; height: 520px; position: relative; }
-        canvas { border: 1px dashed #ccc; background-color: #fcfcfc; }
-        
-        .result-panel { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); text-align: center; }
-        .result-panel h2 { margin: 0 0 15px 0; color: #333; }
-        .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px; }
-        .stat-box { background: #e9ecef; padding: 10px; border-radius: 5px; font-size: 13px; }
-        .stat-box span { font-weight: bold; color: #007bff; display: block; font-size: 18px; margin-top: 5px; }
-        
-        #statusAlert { padding: 15px; border-radius: 5px; font-weight: bold; font-size: 14px; }
-        .status-stable { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
-        .status-unstable { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
-        .status-overstable { background-color: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
+        .status { padding: 15px; border-radius: 6px; font-weight: bold; font-size: 16px; }
+        .stable { background-color: #d1e7dd; color: #0f5132; border: 1px solid #badbcc; }
+        .unstable { background-color: #f8d7da; color: #842029; border: 1px solid #f5c2c7; }
+        .overstable { background-color: #fff3cd; color: #664d03; border: 1px solid #ffecb5; }
     </style>
 </head>
 <body>
 
-<div class="header">
-    <h1>🚀 모형로켓 비행안전성 시뮬레이터 Pro</h1>
-    <p>사다리꼴 날개의 세부 치수와 개수를 입력하여 실제 로켓의 비행안전성(Caliber) 변화를 관찰하세요.</p>
-</div>
-
-<div class="main-container">
-    <div class="controls">
-        <div class="add-panel">
-            <select id="partSelector">
+<div class="container">
+    <div class="left-panel">
+        <h1>🛠️ 부품 설계 패널</h1>
+        <div class="control-group">
+            <select id="partType">
                 <option value="body">몸체 (바디튜브)</option>
                 <option value="nosecone">노즈콘</option>
-                <option value="fin">날개 (사다리꼴)</option>
+                <option value="fin">사다리꼴 날개</option>
                 <option value="motor">모터</option>
             </select>
-            <button onclick="addPart()">+ 물체 추가</button>
+            <button onclick="addPart()">+ 부품 추가</button>
         </div>
-        <div id="partsList"></div>
+        <div id="partList"></div>
     </div>
 
-    <div class="visualization">
-        <div class="canvas-container">
-            <canvas id="rocketCanvas" width="320" height="480"></canvas>
+    <div class="right-panel">
+        <div class="result-box">
+            <h2>비행 안정성 (Caliber) 분석</h2>
+            <div class="metrics">
+                <div class="metric">무게중심 (CG)<span id="resCG">0.0</span></div>
+                <div class="metric">압력중심 (CP)<span id="resCP">0.0</span></div>
+                <div class="metric">Caliber<span id="resCaliber">0.00</span></div>
+            </div>
+            <div id="resStatus" class="status unstable">데이터를 입력해주세요.</div>
         </div>
         
-        <div class="result-panel">
-            <h2>비행 안전성 결과 (Caliber)</h2>
-            <div class="stats">
-                <div class="stat-box">무게중심 (CG) <span id="valCG">0.0 mm</span></div>
-                <div class="stat-box">압력중심 (CP) <span id="valCP">0.0 mm</span></div>
-                <div class="stat-box">최대 지름 <span id="valDia">0.0 mm</span></div>
-                <div class="stat-box">Caliber <span id="valCaliber">0.00</span></div>
-            </div>
-            <div id="statusAlert" class="status-unstable">부품을 추가하여 설계를 시작하세요.</div>
+        <div class="canvas-wrapper">
+            <canvas id="canvas" width="300" height="430"></canvas>
         </div>
     </div>
 </div>
 
 <script>
-    // 각 부품의 기본 변수 정의
-    const partDefinitions = {
-        'body': { 
-            name: '몸체 (바디튜브)', 
-            fields: { weight: '무게(g)', pos: '위치(mm)', diameter: '지름(mm)', length: '길이(mm)' }, 
-            default: { weight: 50, pos: 0, diameter: 30, length: 220 } 
-        },
-        'nosecone': { 
-            name: '노즈콘', 
-            fields: { weight: '무게(g)', pos: '위치(mm)', diameter: '지름(mm)', height: '높이(mm)' }, 
-            default: { weight: 25, pos: 220, diameter: 30, height: 70 } 
-        },
+    // 부품 메타데이터 (날개에 sweep, count, root_chord, tip_chord 포함)
+    const templates = {
+        'body': { name: '몸체 (바디튜브)', fields: { w: '무게(g)', y: '하단부터 위치(mm)', d: '지름(mm)', l: '길이(mm)' }, defaults: { w: 50, y: 0, d: 35, l: 250 } },
+        'nosecone': { name: '노즈콘', fields: { w: '무게(g)', y: '하단부터 위치(mm)', d: '지름(mm)', l: '길이/높이(mm)' }, defaults: { w: 20, y: 250, d: 35, l: 80 } },
         'fin': { 
-            name: '날개 (사다리꼴)', 
+            name: '사다리꼴 날개', 
             fields: { 
-                weight: '무게(g)', 
-                pos: '위치(mm)', 
-                height: '날개 높이(mm)', 
-                root_chord: '뿌리 길이(Cr - mm)', 
-                tip_chord: '끝단 길이(Ct - mm)', 
-                sweep: '후퇴 길이(S - mm)', 
-                count: '날개 개수(개)' 
+                w: '무게(g)', y: '하단부터 위치(mm)', 
+                count: '날개 개수(개)★', span: '날개 높이/폭(mm)', 
+                root: '뿌리 길이(Cr - mm)', tip: '끝단 길이(Ct - mm)', 
+                sweep: '후퇴 길이(Sweep - mm)★' 
             }, 
-            default: { weight: 12, pos: 0, height: 35, root_chord: 50, tip_chord: 20, sweep: 25, count: 4 } 
+            defaults: { w: 15, y: 0, count: 4, span: 40, root: 60, tip: 25, sweep: 30 } 
         },
-        'motor': { 
-            name: '모터', 
-            fields: { weight: '무게(g)', pos: '위치(mm)', diameter: '지름(mm)', height: '높이(mm)' }, 
-            default: { weight: 38, pos: -15, diameter: 18, height: 70 } 
-        }
+        'motor': { name: '모터', fields: { w: '무게(g)', y: '하단부터 위치(mm)', d: '지름(mm)', l: '길이(mm)' }, defaults: { w: 45, y: -5, d: 18, l: 70 } }
     };
 
     let parts = [];
-    let partIdCounter = 0;
+    let uid = 0;
+    const ctx = document.getElementById('canvas').getContext('2d');
 
-    const canvas = document.getElementById('rocketCanvas');
-    const ctx = canvas.getContext('2d');
-
-    // 초기값 세팅
+    // 초기 샘플 데이터 로드
     window.onload = () => {
-        addSpecificPart('body');
-        addSpecificPart('nosecone');
-        addSpecificPart('fin');
+        add('body', templates.body.defaults);
+        add('nosecone', templates.nosecone.defaults);
+        add('fin', templates.fin.defaults);
+        renderUI();
     };
 
     function addPart() {
-        const type = document.getElementById('partSelector').value;
-        addSpecificPart(type);
+        const type = document.getElementById('partType').value;
+        add(type, templates[type].defaults);
+        renderUI();
     }
 
-    function addSpecificPart(type) {
-        const def = partDefinitions[type];
-        const newPart = { id: partIdCounter++, type: type, ...def.default };
-        parts.push(newPart);
-        renderPartsList();
-        updateSimulation();
+    function add(type, data) {
+        parts.push({ id: ++uid, type, ...data });
     }
 
     function removePart(id) {
         parts = parts.filter(p => p.id !== id);
-        renderPartsList();
-        updateSimulation();
+        renderUI();
     }
 
-    function handleInputChange(id, field, value) {
+    function updateValue(id, key, val) {
         const part = parts.find(p => p.id === id);
         if (part) {
-            part[field] = parseFloat(value) || 0;
-            updateSimulation();
+            part[key] = parseFloat(val) || 0;
+            calculate(); // 입력 즉시 재계산 및 렌더링
         }
     }
 
-    function renderPartsList() {
-        const container = document.getElementById('partsList');
-        container.innerHTML = '';
+    function renderUI() {
+        const list = document.getElementById('partList');
+        list.innerHTML = '';
         
-        parts.forEach(part => {
-            const def = partDefinitions[part.type];
-            let html = `
-                <div class="part-card">
-                    <h3>${def.name}</h3>
-                    <button class="remove-btn" onclick="removePart(${part.id})">삭제</button>
-                    <div class="input-grid">
-            `;
-            
-            for (const [field, label] of Object.entries(def.fields)) {
-                html += `
-                    <div class="input-group">
-                        <label>${label}</label>
-                        <input type="number" step="1" value="${part[field]}" oninput="handleInputChange(${part.id}, '${field}', this.value)">
-                    </div>
-                `;
-            }
-            
-            html += `</div></div>`;
-            container.innerHTML += html;
-        });
-    }
-
-    function updateSimulation() {
-        let totalWeight = 0;
-        let weightedSumCG = 0;
-        
-        let maxDiameter = 0.1; // 0 나누기 방지용 최솟값
-        let cpNumerator = 0;
-        let cpDenominator = 0;
-
-        let maxDrawHeight = 100;
-        let minDrawHeight = 0;
-
-        // 최대 지름 구하기 (몸체와 노즈콘 기준)
         parts.forEach(p => {
-            if ((p.type === 'body' || p.type === 'nosecone') && p.diameter > maxDiameter) {
-                maxDiameter = p.diameter;
-            }
-        });
-
-        parts.forEach(p => {
-            // 1. CG (무게중심) 계산
-            let partCG = p.pos;
-            if (p.type === 'body') partCG = p.pos + (p.length / 2);
-            else if (p.type === 'nosecone') partCG = p.pos + (p.height * 0.4);
-            else if (p.type === 'fin') partCG = p.pos + (p.root_chord * 0.4); // 날개 기하학적 무게중심 근사
-            else if (p.type === 'motor') partCG = p.pos + (p.height / 2);
+            const t = templates[p.type];
+            let html = `<div class="part-card">
+                <h3>${t.name}</h3>
+                <button class="delete-btn" onclick="removePart(${p.id})">삭제</button>
+                <div class="input-grid">`;
             
-            totalWeight += p.weight;
-            weightedSumCG += (p.weight * partCG);
-
-            // 캔버스 렌더링 세팅용 높이 한계 측정
-            let topPos = p.pos + (p.length || p.height || p.root_chord || 0);
-            let bottomPos = p.pos;
-            if (topPos > maxDrawHeight) maxDrawHeight = topPos;
-            if (bottomPos < minDrawHeight) minDrawHeight = bottomPos;
-
-            // 2. CP (압력중심) 계산 - 바로우만(Barrowman) 방정식 반영
-            if (p.type === 'nosecone') {
-                let cN_nose = 2.0; // 원추형 노즈콘 공기역학 계수
-                let partCP = p.pos + (p.height * 0.466); 
-                cpNumerator += (cN_nose * partCP);
-                cpDenominator += cN_nose;
-            } else if (p.type === 'fin') {
-                const S = p.sweep;          // 후퇴 길이
-                const Cr = p.root_chord;    // 뿌리 길이
-                const Ct = p.tip_chord;     // 끝단 길이
-                const s = p.height;         // 날개 높이
-                const N = p.count;          // 날개 개수
-                const d = maxDiameter;      // 참조 지름 (최대 몸체 지름)
-                const R = d / 2;            // 몸체 반지름
-
-                const sum_C = (Cr + Ct) || 0.1;
-
-                // 간섭 효과 및 날개 고유 양력 계수 (Barrowman)
-                const interference = 1 + (R / (R + s));
-                const a = S + (Ct / 2) - (Cr / 2);
-                const Lc = Math.sqrt(a * a + s * s); // 중간 코드선 길이
-                const term = 1 + Math.sqrt(1 + Math.pow(2 * Lc / sum_C, 2));
-                const cN_fin = interference * (4 * N * Math.pow(s / d, 2)) / term;
-
-                // 날개 자체의 압력중심 거리 (앞단 기준 하단으로 내려가는 거리)
-                const X_f = (S / 3) * ((Cr + 2 * Ct) / sum_C) + (1 / 6) * (Cr + Ct - (Cr * Ct) / sum_C);
+            for (let key in t.fields) {
+                const labelText = t.fields[key];
+                const isHighlight = labelText.includes('★'); // 날개 중요 속성 강조
+                const cleanLabel = labelText.replace('★', '');
                 
-                // 바디튜브 하단(0) 기준의 날개 CP 좌표
-                const partCP = (p.pos + Cr) - X_f;
+                html += `
+                <div class="input-item">
+                    <label class="${isHighlight ? 'highlight-label' : ''}">${cleanLabel}</label>
+                    <input type="number" step="1" value="${p[key]}" oninput="updateValue(${p.id}, '${key}', this.value)">
+                </div>`;
+            }
+            html += `</div></div>`;
+            list.innerHTML += html;
+        });
+        calculate();
+    }
 
-                cpNumerator += (cN_fin * partCP);
-                cpDenominator += cN_fin;
+    function calculate() {
+        let W = 0, sumCG = 0;
+        let maxD = 0.1, sumCP = 0, sumCN = 0;
+        let maxY = 100, minY = 0;
+
+        // 최대 지름 탐색 (몸체/노즈콘 기준)
+        parts.forEach(p => {
+            if ((p.type === 'body' || p.type === 'nosecone') && p.d > maxD) maxD = p.d;
+        });
+
+        parts.forEach(p => {
+            let cg = p.y;
+            let top = p.y;
+            
+            // CG 및 렌더링 높이 계산
+            if (p.type === 'body') { cg = p.y + p.l / 2; top = p.y + p.l; }
+            if (p.type === 'nosecone') { cg = p.y + p.l * 0.4; top = p.y + p.l; }
+            if (p.type === 'motor') { cg = p.y + p.l / 2; top = p.y + p.l; }
+            if (p.type === 'fin') { cg = p.y + p.root * 0.4; top = p.y + p.root; }
+
+            W += p.w;
+            sumCG += (p.w * cg);
+            if (top > maxY) maxY = top;
+            if (p.y < minY) minY = p.y;
+
+            // CP (바로우만 방정식)
+            if (p.type === 'nosecone') {
+                let cn = 2.0;
+                let cp = p.y + p.l * 0.466;
+                sumCN += cn; sumCP += (cn * cp);
+            } 
+            if (p.type === 'fin') {
+                const R = maxD / 2;
+                const cr = p.root, ct = p.tip, s = p.span, sw = p.sweep, N = p.count;
+                
+                // 간섭 계수 및 C_N 계산
+                const KFB = 1 + (R / (R + s));
+                const Lc = Math.sqrt(Math.pow(s, 2) + Math.pow(sw + ct/2 - cr/2, 2));
+                const term = 1 + Math.sqrt(1 + Math.pow(2 * Lc / (cr + ct), 2));
+                let cn = KFB * (4 * N * Math.pow(s / maxD, 2)) / term;
+                
+                // 날개 고유 압력중심 위치 (뿌리 앞단에서부터 뒤로)
+                let xf = (sw / 3) * (cr + 2*ct) / (cr + ct) + (1/6) * (cr + ct - (cr*ct)/(cr+ct));
+                let cp = (p.y + cr) - xf; // 하단(0) 기준 절대 위치 변환
+                
+                sumCN += cn; sumCP += (cn * cp);
             }
         });
 
-        // 최종 CG, CP 계산
-        const finalCG = totalWeight > 0 ? (weightedSumCG / totalWeight) : 0;
-        const finalCP = cpDenominator > 0 ? (cpNumerator / cpDenominator) : 0;
-        
-        // Caliber 계산 (바디튜브 하단 기준이므로 CG가 CP보다 높아야 양수가 나오며 안전함)
-        let caliber = 0;
-        if (maxDiameter > 0 && cpDenominator > 0) {
-            caliber = (finalCG - finalCP) / maxDiameter;
-        }
+        const CG = W > 0 ? sumCG / W : 0;
+        const CP = sumCN > 0 ? sumCP / sumCN : 0;
+        const caliber = sumCN > 0 ? (CG - CP) / maxD : 0;
 
-        // 결과 인터페이스 업데이트
-        document.getElementById('valCG').innerText = finalCG.toFixed(1) + " mm";
-        document.getElementById('valCP').innerText = finalCP.toFixed(1) + " mm";
-        document.getElementById('valDia').innerText = maxDiameter.toFixed(1) + " mm";
-        document.getElementById('valCaliber').innerText = caliber.toFixed(2);
+        // 결과 반영
+        document.getElementById('resCG').innerText = CG.toFixed(1) + ' mm';
+        document.getElementById('resCP').innerText = CP.toFixed(1) + ' mm';
+        document.getElementById('resCaliber').innerText = caliber.toFixed(2);
 
-        const statusAlert = document.getElementById('statusAlert');
+        const statusEl = document.getElementById('resStatus');
         if (parts.length === 0) {
-            statusAlert.className = 'status-unstable';
-            statusAlert.innerText = '부품을 추가하여 설계를 시작하세요.';
+            statusEl.className = 'status unstable'; statusEl.innerText = '부품이 없습니다.';
         } else if (caliber < 1.0) {
-            statusAlert.className = 'status-unstable';
-            statusAlert.innerText = '⚠️ 불안정 (Unstable) - CG가 너무 낮거나 CP가 너무 높습니다. 날개 개수를 늘리거나 후퇴 길이를 늘려서 CP를 내리세요!';
+            statusEl.className = 'status unstable'; statusEl.innerText = '불안정 (Unstable) - 날개를 키우거나 뒤로 빼세요!';
         } else if (caliber <= 2.0) {
-            statusAlert.className = 'status-stable';
-            statusAlert.innerText = '✅ 안정 (Stable) - 이상적인 비행 안정성을 유지하고 있습니다. 직진 비행에 적합합니다.';
+            statusEl.className = 'status stable'; statusEl.innerText = '안정 (Stable) - 비행에 적합합니다.';
         } else {
-            statusAlert.className = 'status-overstable';
-            statusAlert.innerText = '⚠️ 과도안정 (Overstable) - 바람이 불면 바람이 불어오는 방향으로 급격히 꺾일 위험이 있습니다. (웨더코킹 현상)';
+            statusEl.className = 'status overstable'; statusEl.innerText = '과도안정 (Overstable) - 바람개비 현상 주의';
         }
 
-        drawRocket(maxDrawHeight, minDrawHeight, finalCG, finalCP);
+        draw(maxY, minY, CG, CP, maxD);
     }
 
-    function drawRocket(maxH, minH, cg, cp) {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+    function draw(maxY, minY, cg, cp, maxD) {
+        const cvs = document.getElementById('canvas');
+        ctx.clearRect(0, 0, cvs.width, cvs.height);
         
-        const rocketTotalHeight = maxH - minH + 50; 
-        const scale = Math.min((canvas.height - 50) / rocketTotalHeight, 1.8); 
-        const centerX = canvas.width / 2;
-        const baseCanvasY = canvas.height - 25 + (minH * scale); 
-
-        // 캔버스 Y좌표 역투영 함수 (로켓 위쪽 좌표가 높은 곳으로 매핑되도록)
-        const toCanvasY = (rocketY) => baseCanvasY - (rocketY * scale);
-
-        // 몸체 지름을 구하여 날개 그리기용 기준으로 삼음
-        const bodyTube = parts.find(p => p.type === 'body');
-        const bodyRadius = bodyTube ? (bodyTube.diameter / 2) : 15;
-
-        // 1. 모터 렌더링
-        parts.filter(p => p.type === 'motor').forEach(p => {
-            ctx.fillStyle = '#555';
-            const w = p.diameter * scale;
-            const h = p.height * scale;
-            ctx.fillRect(centerX - w/2, toCanvasY(p.pos + p.height), w, h);
-        });
-
-        // 2. 날개(Fin) 렌더링 (사다리꼴 날개 및 Sweep 완벽 시각화)
-        parts.filter(p => p.type === 'fin').forEach(p => {
-            ctx.fillStyle = '#007bff';
-            ctx.strokeStyle = '#0056b3';
-            ctx.lineWidth = 1.5;
-
-            const h = p.height * scale;
-            const Cr = p.root_chord * scale;
-            const Ct = p.tip_chord * scale;
-            const S = p.sweep * scale;
-            const bR = bodyRadius * scale;
-
-            // 로켓 하단 기준의 4개 정점 계산
-            const y_root_lead = toCanvasY(p.pos + p.root_chord);
-            const y_tip_lead = toCanvasY(p.pos + p.root_chord - p.sweep);
-            const y_tip_trail = toCanvasY(p.pos + p.root_chord - p.sweep - p.tip_chord);
-            const y_root_trail = toCanvasY(p.pos);
-
-            // 왼쪽 날개
-            ctx.beginPath();
-            ctx.moveTo(centerX - bR, y_root_lead);
-            ctx.lineTo(centerX - bR - h, y_tip_lead);
-            ctx.lineTo(centerX - bR - h, y_tip_trail);
-            ctx.lineTo(centerX - bR, y_root_trail);
-            ctx.closePath();
-            ctx.fill();
-            ctx.stroke();
-
-            // 오른쪽 날개
-            ctx.beginPath();
-            ctx.moveTo(centerX + bR, y_root_lead);
-            ctx.lineTo(centerX + bR + h, y_tip_lead);
-            ctx.lineTo(centerX + bR + h, y_tip_trail);
-            ctx.lineTo(centerX + bR, y_root_trail);
-            ctx.closePath();
-            ctx.fill();
-            ctx.stroke();
-        });
-
-        // 3. 바디튜브 렌더링
-        parts.filter(p => p.type === 'body').forEach(p => {
-            ctx.fillStyle = '#f1f1f1';
-            ctx.strokeStyle = '#777';
-            ctx.lineWidth = 2;
-            const w = p.diameter * scale;
-            const h = p.length * scale;
-            ctx.fillRect(centerX - w/2, toCanvasY(p.pos + p.length), w, h);
-            ctx.strokeRect(centerX - w/2, toCanvasY(p.pos + p.length), w, h);
-        });
-
-        // 4. 노즈콘 렌더링
-        parts.filter(p => p.type === 'nosecone').forEach(p => {
-            ctx.fillStyle = '#dc3545';
-            const w = p.diameter * scale;
-            const h = p.height * scale;
-            const bottomY = toCanvasY(p.pos);
-            const topY = toCanvasY(p.pos + p.height);
-
-            ctx.beginPath();
-            ctx.moveTo(centerX - w/2, bottomY);
-            ctx.quadraticCurveTo(centerX - w/2, topY, centerX, topY);
-            ctx.quadraticCurveTo(centerX + w/2, topY, centerX + w/2, bottomY);
-            ctx.closePath();
-            ctx.fill();
-        });
-
-        // 마커 출력 헬퍼 함수
-        function drawMarker(y, color, label) {
-            const cy = toCanvasY(y);
-            ctx.beginPath();
-            ctx.arc(centerX, cy, 7, 0, Math.PI * 2);
-            ctx.fillStyle = color;
-            ctx.fill();
-            ctx.strokeStyle = '#fff';
-            ctx.lineWidth = 2;
-            ctx.stroke();
-
-            // 크로스헤어 데코레이션
-            ctx.beginPath();
-            ctx.strokeStyle = '#fff';
-            ctx.lineWidth = 1;
-            ctx.moveTo(centerX - 10, cy); ctx.lineTo(centerX + 10, cy);
-            ctx.moveTo(centerX, cy - 10); ctx.lineTo(centerX, cy + 10);
-            ctx.stroke();
-
-            ctx.fillStyle = color;
-            ctx.font = 'bold 12px Arial';
-            ctx.fillText(label, centerX + 18, cy + 4);
-        }
-
-        // CG 마커 (파란색)
-        if (parts.length > 0) drawMarker(cg, '#0056b3', 'CG (무게중심)');
-        // CP 마커 (빨간색)
-        if (parts.length > 0) drawMarker(cp, '#c82333', 'CP (압력중심)');
+        const pad = 30;
+        const H = maxY - minY + pad * 2;
+        const scale = Math.min((cvs.height - pad*2) / H, 1.5);
+        const cx = cvs.width / 2;
+        const baseY = cvs.height - pad + (minY * scale);
         
-        // 0mm 하단 가이드라인
-        ctx.strokeStyle = '#bbb';
-        ctx.setLineDash([4, 4]);
-        ctx.beginPath();
-        ctx.moveTo(centerX - 80, baseCanvasY);
-        ctx.lineTo(centerX + 80, baseCanvasY);
-        ctx.stroke();
-        ctx.setLineDash([]);
-        
+        const tY = (y) => baseY - (y * scale);
+        const bR = (maxD / 2) * scale; // 참조 몸체 반지름
+
+        // 1. 모터
         ctx.fillStyle = '#666';
-        ctx.font = '11px Arial';
-        ctx.fillText("0mm (하단 기준선)", centerX + 85, baseCanvasY + 4);
+        parts.filter(p => p.type === 'motor').forEach(p => {
+            let w = p.d * scale, h = p.l * scale;
+            ctx.fillRect(cx - w/2, tY(p.y + p.l), w, h);
+        });
+
+        // 2. 날개 (Sweep, Root, Tip 완벽 적용)
+        ctx.fillStyle = 'rgba(0, 123, 255, 0.7)';
+        ctx.strokeStyle = '#0056b3';
+        ctx.lineWidth = 1;
+        parts.filter(p => p.type === 'fin').forEach(p => {
+            let cr = p.root * scale, ct = p.tip * scale, sw = p.sweep * scale, s = p.span * scale;
+            
+            let y_root_top = tY(p.y + p.root);
+            let y_tip_top = tY(p.y + p.root - p.sweep);
+            let y_tip_bot = tY(p.y + p.root - p.sweep - p.tip);
+            let y_root_bot = tY(p.y);
+
+            // 좌측 날개
+            ctx.beginPath();
+            ctx.moveTo(cx - bR, y_root_top);
+            ctx.lineTo(cx - bR - s, y_tip_top);
+            ctx.lineTo(cx - bR - s, y_tip_bot);
+            ctx.lineTo(cx - bR, y_root_bot);
+            ctx.closePath(); ctx.fill(); ctx.stroke();
+
+            // 우측 날개
+            ctx.beginPath();
+            ctx.moveTo(cx + bR, y_root_top);
+            ctx.lineTo(cx + bR + s, y_tip_top);
+            ctx.lineTo(cx + bR + s, y_tip_bot);
+            ctx.lineTo(cx + bR, y_root_bot);
+            ctx.closePath(); ctx.fill(); ctx.stroke();
+        });
+
+        // 3. 바디튜브
+        ctx.fillStyle = '#f8f9fa';
+        ctx.strokeStyle = '#adb5bd';
+        parts.filter(p => p.type === 'body').forEach(p => {
+            let w = p.d * scale, h = p.l * scale;
+            ctx.fillRect(cx - w/2, tY(p.y + p.l), w, h);
+            ctx.strokeRect(cx - w/2, tY(p.y + p.l), w, h);
+        });
+
+        // 4. 노즈콘
+        ctx.fillStyle = '#dc3545';
+        parts.filter(p => p.type === 'nosecone').forEach(p => {
+            let w = p.d * scale, h = p.l * scale;
+            let topY = tY(p.y + p.l), botY = tY(p.y);
+            ctx.beginPath();
+            ctx.moveTo(cx - w/2, botY);
+            ctx.quadraticCurveTo(cx - w/2, topY, cx, topY);
+            ctx.quadraticCurveTo(cx + w/2, topY, cx + w/2, botY);
+            ctx.closePath(); ctx.fill();
+        });
+
+        // 마커 헬퍼 함수
+        const drawMarker = (y, color, text) => {
+            let py = tY(y);
+            ctx.beginPath(); ctx.arc(cx, py, 6, 0, Math.PI*2);
+            ctx.fillStyle = color; ctx.fill();
+            ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+            
+            ctx.fillStyle = color; ctx.font = 'bold 12px Arial';
+            ctx.fillText(text, cx + 12, py + 4);
+        };
+
+        if (W > 0) drawMarker(cg, '#0d6efd', 'CG'); // 무게중심 파란색
+        if (sumCN > 0) drawMarker(cp, '#dc3545', 'CP'); // 압력중심 빨간색
+        
+        // 0점 기준선
+        ctx.strokeStyle = '#999'; ctx.setLineDash([4, 4]);
+        ctx.beginPath(); ctx.moveTo(0, baseY); ctx.lineTo(cvs.width, baseY); ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = '#666'; ctx.font = '10px Arial';
+        ctx.fillText('0mm (기준선)', 5, baseY - 5);
     }
 </script>
 
