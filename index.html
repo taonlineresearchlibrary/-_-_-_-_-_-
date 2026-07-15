@@ -2,18 +2,17 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>정밀 모형로켓 시뮬레이터 (전체 보기 수정)</title>
+    <title>정밀 모형로켓 시뮬레이터 (자동 스케일 적용)</title>
     <style>
         body { font-family: 'Malgun Gothic', sans-serif; background-color: #f0f4f8; margin: 0; padding: 20px; }
         .container { max-width: 1200px; margin: 0 auto; display: flex; gap: 20px; }
         .left-panel { flex: 1.2; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
         .right-panel { flex: 1; display: flex; flex-direction: column; gap: 20px; }
-        .part-card { background: #fdfdfd; border: 1px solid #e0e0e0; padding: 15px; margin-bottom: 10px; border-radius: 6px; position: relative; }
+        .part-card { background: #fdfdfd; border: 1px solid #e0e0e0; padding: 15px; margin-bottom: 10px; border-radius: 6px; }
         .input-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 10px; }
         .input-item { display: flex; flex-direction: column; font-size: 12px; }
         .status-box { background: #e9ecef; padding: 20px; border-radius: 8px; text-align: center; }
-        /* 캔버스 높이 확보 및 중앙 정렬 */
-        canvas { background: #fff; border: 1px solid #ccc; border-radius: 8px; width: 100%; height: 600px; }
+        canvas { background: #fff; border: 1px solid #ccc; border-radius: 8px; width: 100%; height: 500px; }
         button { padding: 8px; cursor: pointer; background: #007bff; color: white; border: none; border-radius: 4px; }
     </style>
 </head>
@@ -72,12 +71,14 @@
 
     function calculate() {
         let W = 0, sumCG = 0, sumCN = 0, sumCP = 0, maxD = 30;
-        let maxY = 500; // 기본 캔버스 길이
+        let maxPos = 0; 
         
         parts.forEach(p => {
             let weight = p.w;
             let cg = p.y;
             let len = p.l || p.height || 0;
+            
+            // 무게중심 계산
             if (p.type === 'body') cg += len / 2;
             else if (p.type === 'nosecone') cg += len * 0.4;
             else if (p.type === 'motor') cg += len / 2;
@@ -92,8 +93,8 @@
                 sumCN += cn;
                 sumCP += (cn * p.y);
             }
-            // 로켓의 최대 길이 추적
-            if (p.y + len > maxY) maxY = p.y + len + 50;
+            // 로켓의 총 길이 측정
+            if (p.y + len > maxPos) maxPos = p.y + len;
         });
 
         const CG = W > 0 ? sumCG / W : 0;
@@ -108,29 +109,36 @@
         if (cal >= 1.0) { resStatus.innerText = "✅ 안정적"; resStatus.style.color = "green"; }
         else { resStatus.innerText = "🚨 불안정!"; resStatus.style.color = "red"; }
         
-        draw(CG, CP, maxY);
+        draw(CG, CP, maxPos);
     }
 
     function draw(cg, cp, totalH) {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        // 스케일 계산: 캔버스 높이에 맞춰 로켓이 꽉 차게 그림
-        const scale = 550 / totalH;
-        
+        if (totalH === 0) return;
+
+        // 여백 및 스케일 조정 (로켓이 캔버스 높이의 80%를 차지하도록)
+        const margin = 40;
+        const availableH = canvas.height - 2 * margin;
+        const scale = availableH / totalH;
+        const startX = canvas.width / 2 - 20;
+
         ctx.strokeStyle = '#333';
         ctx.lineWidth = 2;
         
-        // 로켓 몸체 그리기 (좌표 조정)
-        ctx.strokeRect(150, 580 - (totalH * scale), 40, totalH * scale);
+        // 몸체 그리기 (밑동이 캔버스 하단이 되도록)
+        ctx.strokeRect(startX, canvas.height - margin - (totalH * scale), 40, totalH * scale);
         
         // CG 표시
         ctx.fillStyle = 'blue';
-        ctx.fillRect(100, 580 - (cg * scale), 140, 3);
-        ctx.fillText("CG (" + cg.toFixed(0) + "mm)", 100, 580 - (cg * scale) - 5);
+        const cgY = canvas.height - margin - (cg * scale);
+        ctx.fillRect(startX - 30, cgY, 100, 3);
+        ctx.fillText("CG", startX - 50, cgY);
 
         // CP 표시
         ctx.fillStyle = 'red';
-        ctx.fillRect(100, 580 - (cp * scale), 140, 3);
-        ctx.fillText("CP (" + cp.toFixed(0) + "mm)", 100, 580 - (cp * scale) + 15);
+        const cpY = canvas.height - margin - (cp * scale);
+        ctx.fillRect(startX - 30, cpY, 100, 3);
+        ctx.fillText("CP", startX - 50, cpY);
     }
 
     function render() {
