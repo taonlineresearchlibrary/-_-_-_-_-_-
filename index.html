@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>모형로켓 비행안전성 시뮬레이터</title>
+    <style>
+        body { font-family: 'Malgun Gothic', sans-serif; background-color: #f4f7f6; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        h1 { color: #333; text-align: center; }
+        .control-panel { display: flex; gap: 10px; margin-bottom: 20px; padding-bottom: 20px; border-bottom: 2px solid #eee; }
+        select, button, input { padding: 8px 12px; font-size: 16px; border: 1px solid #ccc; border-radius: 5px; }
+        button { background-color: #007bff; color: white; border: none; cursor: pointer; transition: 0.3s; }
+        button:hover { background-color: #0056b3; }
+        .part-card { background: #f9f9f9; border: 1px solid #ddd; padding: 15px; margin-bottom: 15px; border-radius: 5px; position: relative; }
+        .part-card h3 { margin-top: 0; color: #555; }
+        .input-group { display: inline-block; margin-right: 15px; margin-bottom: 10px; }
+        .input-group label { display: block; font-size: 14px; margin-bottom: 5px; color: #666; }
+        .remove-btn { position: absolute; top: 15px; right: 15px; background-color: #dc3545; font-size: 12px; padding: 5px 10px; }
+        .remove-btn:hover { background-color: #c82333; }
+        .result-panel { text-align: center; margin-top: 30px; padding: 20px; background: #e9ecef; border-radius: 10px; }
+        .result-panel h2 { margin: 0; color: #28a745; font-size: 28px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>모형로켓 비행안전성 시뮬레이터</h1>
+    <p style="text-align: center; color: #666;">(Caliber 계산기)</p>
+
+    <div class="control-panel">
+        <select id="partSelector">
+            <option value="nosecone">노즈콘</option>
+            <option value="body">몸체</option>
+            <option value="fin">날개</option>
+            <option value="motor">모터</option>
+            <option value="other">기타</option>
+        </select>
+        <button onclick="addPart()">+ 물체추가</button>
+    </div>
+
+    <div id="partsContainer">
+        </div>
+
+    <div class="result-panel">
+        <button onclick="calculateCaliber()" style="background-color: #28a745; margin-bottom: 15px; width: 100%; font-size: 18px; padding: 15px;">Caliber 계산하기</button>
+        <h2>Caliber (Cali): <span id="caliberResult">0.00</span></h2>
+        <p style="font-size: 14px; color: #777; margin-top: 10px;">* 안전한 비행을 위한 권장 Caliber는 1.0 ~ 2.0 사이입니다.</p>
+    </div>
+</div>
+
+<script>
+    // 부품별 입력 필드 정의 (스캔 문서 기반)
+    const partFields = {
+        'nosecone': { name: '노즈콘', fields: { weight: '무게(g)', diameter: '지름(mm)', height: '높이(mm)' } },
+        'body': { name: '몸체', fields: { weight: '무게(g)', diameter: '지름(mm)', length: '길이(mm)' } },
+        'fin': { name: '날개', fields: { weight: '무게(g)', height: '높이(mm)', sweep: '후퇴길이(mm)' } },
+        'motor': { name: '모터', fields: { weight: '무게(g)', diameter: '지름(mm)', height: '높이(mm)' } },
+        'other': { name: '기타', fields: { weight: '무게(g)', width: '가로(mm)', height: '세로(mm)' } }
+    };
+
+    let partCounter = 0;
+
+    // 물체 추가 기능
+    function addPart() {
+        const selector = document.getElementById('partSelector');
+        const partType = selector.value;
+        const partInfo = partFields[partType];
+        
+        const container = document.getElementById('partsContainer');
+        const partId = 'part_' + partCounter++;
+
+        let html = `<div class="part-card" id="${partId}">
+                        <h3>${partInfo.name}</h3>
+                        <button class="remove-btn" onclick="removePart('${partId}')">삭제</button>
+                        <div class="fields">`;
+        
+        // 스케치하신 내용에 맞게 입력창 생성
+        for (const [key, label] of Object.entries(partInfo.fields)) {
+            html += `
+                <div class="input-group">
+                    <label>${label}</label>
+                    <input type="number" step="0.1" class="${key}" placeholder="0" onchange="calculateCaliber()">
+                </div>
+            `;
+        }
+
+        html += `</div></div>`;
+        container.insertAdjacentHTML('beforeend', html);
+    }
+
+    // 물체 삭제 기능
+    function removePart(partId) {
+        document.getElementById(partId).remove();
+        calculateCaliber();
+    }
+
+    // Caliber 계산 (시뮬레이션 예시 로직)
+    function calculateCaliber() {
+        // 실제 Caliber는 CG(무게중심)와 CP(압력중심)의 위치 차이를 최대 지름으로 나눈 값입니다.
+        // 현재는 UI 프레임워크이므로 임시 계산식을 적용해 두었습니다. 
+        // 실제 바로우만(Barrowman) 방정식을 적용하려면 각 부품의 '위치(x좌표)' 입력값이 추가로 필요합니다.
+        
+        let totalWeight = 0;
+        let maxDiameter = 0;
+
+        document.querySelectorAll('.part-card').forEach(card => {
+            const weightInput = card.querySelector('.weight');
+            const diameterInput = card.querySelector('.diameter');
+            
+            if (weightInput) totalWeight += parseFloat(weightInput.value || 0);
+            if (diameterInput) {
+                const dia = parseFloat(diameterInput.value || 0);
+                if (dia > maxDiameter) maxDiameter = dia;
+            }
+        });
+
+        // 결과값 UI 업데이트 (현재는 뼈대이므로 임의의 랜덤/가공값이나 기본 계산을 보여줌)
+        const resultSpan = document.getElementById('caliberResult');
+        
+        if (maxDiameter === 0 || totalWeight === 0) {
+            resultSpan.innerText = "0.00";
+            return;
+        }
+
+        // 임시 디스플레이용 결과 (실제 공기역학 계산식으로 대체 필요)
+        const mockCaliber = (totalWeight / (maxDiameter * 10)).toFixed(2); 
+        resultSpan.innerText = mockCaliber + " (임시값)";
+    }
+</script>
+
+</body>
+</html>
