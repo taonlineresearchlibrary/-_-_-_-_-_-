@@ -3,129 +3,350 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>모형로켓 비행안전성 시뮬레이터</title>
+    <title>모형로켓 비행안전성 시뮬레이터 (2D)</title>
     <style>
-        body { font-family: 'Malgun Gothic', sans-serif; background-color: #f4f7f6; padding: 20px; }
-        .container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
-        h1 { color: #333; text-align: center; }
-        .control-panel { display: flex; gap: 10px; margin-bottom: 20px; padding-bottom: 20px; border-bottom: 2px solid #eee; }
-        select, button, input { padding: 8px 12px; font-size: 16px; border: 1px solid #ccc; border-radius: 5px; }
-        button { background-color: #007bff; color: white; border: none; cursor: pointer; transition: 0.3s; }
+        body { font-family: 'Malgun Gothic', sans-serif; background-color: #f4f7f6; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
+        .header { text-align: center; margin-bottom: 20px; }
+        .header h1 { color: #333; margin: 0 0 5px 0; }
+        .header p { color: #666; margin: 0; font-size: 14px; }
+        
+        .main-container { display: flex; flex-direction: row; gap: 20px; width: 100%; max-width: 1200px; }
+        
+        /* 왼쪽: 컨트롤 패널 */
+        .controls { flex: 1; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); max-height: 80vh; overflow-y: auto; }
+        .add-panel { display: flex; gap: 10px; margin-bottom: 20px; padding-bottom: 20px; border-bottom: 2px solid #eee; }
+        select, button, input { padding: 8px; font-size: 14px; border: 1px solid #ccc; border-radius: 5px; }
+        button { background-color: #007bff; color: white; border: none; cursor: pointer; font-weight: bold; }
         button:hover { background-color: #0056b3; }
+        
         .part-card { background: #f9f9f9; border: 1px solid #ddd; padding: 15px; margin-bottom: 15px; border-radius: 5px; position: relative; }
-        .part-card h3 { margin-top: 0; color: #555; }
-        .input-group { display: inline-block; margin-right: 15px; margin-bottom: 10px; }
-        .input-group label { display: block; font-size: 14px; margin-bottom: 5px; color: #666; }
-        .remove-btn { position: absolute; top: 15px; right: 15px; background-color: #dc3545; font-size: 12px; padding: 5px 10px; }
+        .part-card h3 { margin: 0 0 10px 0; color: #444; font-size: 16px; }
+        .remove-btn { position: absolute; top: 10px; right: 10px; background-color: #dc3545; padding: 4px 8px; font-size: 12px; }
         .remove-btn:hover { background-color: #c82333; }
-        .result-panel { text-align: center; margin-top: 30px; padding: 20px; background: #e9ecef; border-radius: 10px; }
-        .result-panel h2 { margin: 0; color: #28a745; font-size: 28px; }
+        
+        .input-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .input-group { display: flex; flex-direction: column; }
+        .input-group label { font-size: 12px; color: #555; margin-bottom: 3px; }
+        
+        /* 오른쪽: 시각화 및 결과 패널 */
+        .visualization { flex: 1; display: flex; flex-direction: column; gap: 20px; }
+        .canvas-container { background: white; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); padding: 20px; display: flex; justify-content: center; align-items: center; height: 500px; position: relative; }
+        canvas { border: 1px dashed #ccc; background-color: #fcfcfc; }
+        
+        .result-panel { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); text-align: center; }
+        .result-panel h2 { margin: 0 0 15px 0; color: #333; }
+        .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px; }
+        .stat-box { background: #e9ecef; padding: 10px; border-radius: 5px; font-size: 14px; }
+        .stat-box span { font-weight: bold; color: #007bff; display: block; font-size: 18px; margin-top: 5px; }
+        
+        #statusAlert { padding: 15px; border-radius: 5px; font-weight: bold; }
+        .status-stable { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .status-unstable { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .status-overstable { background-color: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <h1>모형로켓 비행안전성 시뮬레이터</h1>
-    <p style="text-align: center; color: #666;">(Caliber 계산기)</p>
+<div class="header">
+    <h1>🚀 모형로켓 비행안전성 시뮬레이터</h1>
+    <p>바디튜브 하단(0mm)을 기준으로 각 부품의 위치를 입력하세요.</p>
+</div>
 
-    <div class="control-panel">
-        <select id="partSelector">
-            <option value="nosecone">노즈콘</option>
-            <option value="body">몸체</option>
-            <option value="fin">날개</option>
-            <option value="motor">모터</option>
-            <option value="other">기타</option>
-        </select>
-        <button onclick="addPart()">+ 물체추가</button>
+<div class="main-container">
+    <div class="controls">
+        <div class="add-panel">
+            <select id="partSelector">
+                <option value="body">몸체 (바디튜브)</option>
+                <option value="nosecone">노즈콘</option>
+                <option value="fin">날개</option>
+                <option value="motor">모터</option>
+            </select>
+            <button onclick="addPart()">+ 물체 추가</button>
+        </div>
+        <div id="partsList"></div>
     </div>
 
-    <div id="partsContainer">
+    <div class="visualization">
+        <div class="canvas-container">
+            <canvas id="rocketCanvas" width="300" height="460"></canvas>
         </div>
-
-    <div class="result-panel">
-        <button onclick="calculateCaliber()" style="background-color: #28a745; margin-bottom: 15px; width: 100%; font-size: 18px; padding: 15px;">Caliber 계산하기</button>
-        <h2>Caliber (Cali): <span id="caliberResult">0.00</span></h2>
-        <p style="font-size: 14px; color: #777; margin-top: 10px;">* 안전한 비행을 위한 권장 Caliber는 1.0 ~ 2.0 사이입니다.</p>
+        
+        <div class="result-panel">
+            <h2>비행 안전성 결과 (Caliber)</h2>
+            <div class="stats">
+                <div class="stat-box">무게중심 (CG) <span id="valCG">0.0 mm</span></div>
+                <div class="stat-box">압력중심 (CP) <span id="valCP">0.0 mm</span></div>
+                <div class="stat-box">최대 지름 <span id="valDia">0.0 mm</span></div>
+                <div class="stat-box">Caliber <span id="valCaliber">0.00</span></div>
+            </div>
+            <div id="statusAlert" class="status-unstable">부품을 추가하여 설계를 시작하세요.</div>
+        </div>
     </div>
 </div>
 
 <script>
-    // 부품별 입력 필드 정의 (스캔 문서 기반)
-    const partFields = {
-        'nosecone': { name: '노즈콘', fields: { weight: '무게(g)', diameter: '지름(mm)', height: '높이(mm)' } },
-        'body': { name: '몸체', fields: { weight: '무게(g)', diameter: '지름(mm)', length: '길이(mm)' } },
-        'fin': { name: '날개', fields: { weight: '무게(g)', height: '높이(mm)', sweep: '후퇴길이(mm)' } },
-        'motor': { name: '모터', fields: { weight: '무게(g)', diameter: '지름(mm)', height: '높이(mm)' } },
-        'other': { name: '기타', fields: { weight: '무게(g)', width: '가로(mm)', height: '세로(mm)' } }
+    // 부품 메타데이터 정의
+    const partDefinitions = {
+        'body': { name: '몸체 (바디튜브)', fields: { weight: '무게(g)', pos: '위치(mm)', diameter: '지름(mm)', length: '길이(mm)' }, default: { weight: 50, pos: 0, diameter: 30, length: 200 } },
+        'nosecone': { name: '노즈콘', fields: { weight: '무게(g)', pos: '위치(mm)', diameter: '지름(mm)', height: '높이(mm)' }, default: { weight: 20, pos: 200, diameter: 30, height: 60 } },
+        'fin': { name: '날개', fields: { weight: '무게(g)', pos: '위치(mm)', height: '높이(mm)', sweep: '폭(mm)' }, default: { weight: 15, pos: 0, height: 50, sweep: 40 } },
+        'motor': { name: '모터', fields: { weight: '무게(g)', pos: '위치(mm)', diameter: '지름(mm)', height: '높이(mm)' }, default: { weight: 40, pos: -10, diameter: 18, height: 70 } }
     };
 
-    let partCounter = 0;
+    let parts = [];
+    let partIdCounter = 0;
 
-    // 물체 추가 기능
+    const canvas = document.getElementById('rocketCanvas');
+    const ctx = canvas.getContext('2d');
+
+    // 초기 상태: 바디튜브와 노즈콘 1개씩 자동 추가
+    window.onload = () => {
+        addSpecificPart('body');
+        addSpecificPart('nosecone');
+        addSpecificPart('fin');
+    };
+
     function addPart() {
-        const selector = document.getElementById('partSelector');
-        const partType = selector.value;
-        const partInfo = partFields[partType];
-        
-        const container = document.getElementById('partsContainer');
-        const partId = 'part_' + partCounter++;
+        const type = document.getElementById('partSelector').value;
+        addSpecificPart(type);
+    }
 
-        let html = `<div class="part-card" id="${partId}">
-                        <h3>${partInfo.name}</h3>
-                        <button class="remove-btn" onclick="removePart('${partId}')">삭제</button>
-                        <div class="fields">`;
-        
-        // 스케치하신 내용에 맞게 입력창 생성
-        for (const [key, label] of Object.entries(partInfo.fields)) {
-            html += `
-                <div class="input-group">
-                    <label>${label}</label>
-                    <input type="number" step="0.1" class="${key}" placeholder="0" onchange="calculateCaliber()">
-                </div>
-            `;
+    function addSpecificPart(type) {
+        const def = partDefinitions[type];
+        const newPart = { id: partIdCounter++, type: type, ...def.default };
+        parts.push(newPart);
+        renderPartsList();
+        updateSimulation();
+    }
+
+    function removePart(id) {
+        parts = parts.filter(p => p.id !== id);
+        renderPartsList();
+        updateSimulation();
+    }
+
+    function handleInputChange(id, field, value) {
+        const part = parts.find(p => p.id === id);
+        if (part) {
+            part[field] = parseFloat(value) || 0;
+            updateSimulation();
         }
-
-        html += `</div></div>`;
-        container.insertAdjacentHTML('beforeend', html);
     }
 
-    // 물체 삭제 기능
-    function removePart(partId) {
-        document.getElementById(partId).remove();
-        calculateCaliber();
-    }
-
-    // Caliber 계산 (시뮬레이션 예시 로직)
-    function calculateCaliber() {
-        // 실제 Caliber는 CG(무게중심)와 CP(압력중심)의 위치 차이를 최대 지름으로 나눈 값입니다.
-        // 현재는 UI 프레임워크이므로 임시 계산식을 적용해 두었습니다. 
-        // 실제 바로우만(Barrowman) 방정식을 적용하려면 각 부품의 '위치(x좌표)' 입력값이 추가로 필요합니다.
+    function renderPartsList() {
+        const container = document.getElementById('partsList');
+        container.innerHTML = '';
         
-        let totalWeight = 0;
-        let maxDiameter = 0;
-
-        document.querySelectorAll('.part-card').forEach(card => {
-            const weightInput = card.querySelector('.weight');
-            const diameterInput = card.querySelector('.diameter');
+        parts.forEach(part => {
+            const def = partDefinitions[part.type];
+            let html = `
+                <div class="part-card">
+                    <h3>${def.name}</h3>
+                    <button class="remove-btn" onclick="removePart(${part.id})">삭제</button>
+                    <div class="input-grid">
+            `;
             
-            if (weightInput) totalWeight += parseFloat(weightInput.value || 0);
-            if (diameterInput) {
-                const dia = parseFloat(diameterInput.value || 0);
-                if (dia > maxDiameter) maxDiameter = dia;
+            for (const [field, label] of Object.entries(def.fields)) {
+                html += `
+                    <div class="input-group">
+                        <label>${label}</label>
+                        <input type="number" step="1" value="${part[field]}" oninput="handleInputChange(${part.id}, '${field}', this.value)">
+                    </div>
+                `;
+            }
+            
+            html += `</div></div>`;
+            container.innerHTML += html;
+        });
+    }
+
+    function updateSimulation() {
+        let totalWeight = 0;
+        let weightedSumCG = 0;
+        
+        let maxDiameter = 0.1; // 0으로 나누기 방지
+        let cpNumerator = 0;
+        let cpDenominator = 0;
+
+        let maxDrawHeight = 100;
+        let minDrawHeight = 0;
+
+        parts.forEach(p => {
+            // 최대 지름 찾기
+            if (p.diameter > maxDiameter) maxDiameter = p.diameter;
+
+            // CG(무게중심) 계산
+            let partCG = p.pos;
+            if (p.type === 'body') partCG = p.pos + (p.length / 2);
+            else if (p.type === 'nosecone') partCG = p.pos + (p.height * 0.4);
+            else if (p.type === 'fin') partCG = p.pos + (p.height / 2);
+            else if (p.type === 'motor') partCG = p.pos + (p.height / 2);
+            
+            totalWeight += p.weight;
+            weightedSumCG += (p.weight * partCG);
+
+            // 렌더링 범위 계산용
+            let topPos = p.pos + (p.length || p.height || 0);
+            let bottomPos = p.pos;
+            if (topPos > maxDrawHeight) maxDrawHeight = topPos;
+            if (bottomPos < minDrawHeight) minDrawHeight = bottomPos;
+
+            // CP(압력중심) 계산 - Barrowman 근사식 단순화 적용 (바디튜브 제외)
+            if (p.type === 'nosecone') {
+                let cN = 2.0;
+                let partCP = p.pos + (p.height * 0.466);
+                cpNumerator += (cN * partCP);
+                cpDenominator += cN;
+            } else if (p.type === 'fin') {
+                // 임의의 안정성 상수를 주어 날개 크기가 CP에 영향을 주도록 함
+                let cN = 4.0 * (p.sweep / 30); 
+                let partCP = p.pos + (p.height * 0.25);
+                cpNumerator += (cN * partCP);
+                cpDenominator += cN;
             }
         });
 
-        // 결과값 UI 업데이트 (현재는 뼈대이므로 임의의 랜덤/가공값이나 기본 계산을 보여줌)
-        const resultSpan = document.getElementById('caliberResult');
+        // 최종 CG, CP 계산
+        const finalCG = totalWeight > 0 ? (weightedSumCG / totalWeight) : 0;
+        const finalCP = cpDenominator > 0 ? (cpNumerator / cpDenominator) : 0;
         
-        if (maxDiameter === 0 || totalWeight === 0) {
-            resultSpan.innerText = "0.00";
-            return;
+        // Caliber 계산 (바디튜브 하단 기준이므로 CG가 CP보다 커야(위에 있어야) 안정적임)
+        let caliber = 0;
+        if (maxDiameter > 0 && cpDenominator > 0) {
+            caliber = (finalCG - finalCP) / maxDiameter;
         }
 
-        // 임시 디스플레이용 결과 (실제 공기역학 계산식으로 대체 필요)
-        const mockCaliber = (totalWeight / (maxDiameter * 10)).toFixed(2); 
-        resultSpan.innerText = mockCaliber + " (임시값)";
+        // 결과 UI 업데이트
+        document.getElementById('valCG').innerText = finalCG.toFixed(1) + " mm";
+        document.getElementById('valCP').innerText = finalCP.toFixed(1) + " mm";
+        document.getElementById('valDia').innerText = maxDiameter.toFixed(1) + " mm";
+        document.getElementById('valCaliber').innerText = caliber.toFixed(2);
+
+        const statusAlert = document.getElementById('statusAlert');
+        if (parts.length === 0) {
+            statusAlert.className = 'status-unstable';
+            statusAlert.innerText = '부품을 추가해주세요.';
+        } else if (caliber < 1.0) {
+            statusAlert.className = 'status-unstable';
+            statusAlert.innerText = '불안정 (Unstable) - CG가 너무 낮거나 CP가 너무 높습니다. (날개 크기를 키우거나 앞부분 무게를 늘리세요)';
+        } else if (caliber <= 2.0) {
+            statusAlert.className = 'status-stable';
+            statusAlert.innerText = '안정 (Stable) - 이상적인 비행 안전성을 가집니다.';
+        } else {
+            statusAlert.className = 'status-overstable';
+            statusAlert.innerText = '과도안정 (Overstable) - 바람의 영향을 많이 받아 경로가 휠 수 있습니다. (바람개비 효과)';
+        }
+
+        drawRocket(maxDrawHeight, minDrawHeight, finalCG, finalCP);
+    }
+
+    function drawRocket(maxH, minH, cg, cp) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // 스케일 및 오프셋 계산 (로켓이 캔버스에 꽉 차도록)
+        const rocketTotalHeight = maxH - minH + 40; // 여백 40
+        const scale = Math.min((canvas.height - 40) / rocketTotalHeight, 2); 
+        const centerX = canvas.width / 2;
+        // 캔버스 Y좌표는 위에서 아래로 증가하므로, 실제 좌표계를 뒤집어야 함
+        // Y = 0 (바디튜브 맨 아래)의 캔버스 상 위치
+        const baseCanvasY = canvas.height - 20 + (minH * scale); 
+
+        // 캔버스 Y좌표 변환 함수
+        const toCanvasY = (rocketY) => baseCanvasY - (rocketY * scale);
+
+        // 부품 그리기 (뒤에 있어야 할 것부터)
+        
+        // 1. 모터
+        parts.filter(p => p.type === 'motor').forEach(p => {
+            ctx.fillStyle = '#666';
+            const w = p.diameter * scale;
+            const h = p.height * scale;
+            ctx.fillRect(centerX - w/2, toCanvasY(p.pos + p.height), w, h);
+        });
+
+        // 2. 날개 (좌/우 대칭으로 그림)
+        parts.filter(p => p.type === 'fin').forEach(p => {
+            ctx.fillStyle = '#007bff';
+            const h = p.height * scale;
+            const w = p.sweep * scale;
+            const topY = toCanvasY(p.pos + p.height);
+            const bottomY = toCanvasY(p.pos);
+
+            // 왼쪽 날개
+            ctx.beginPath();
+            ctx.moveTo(centerX - 10, topY); 
+            ctx.lineTo(centerX - 10 - w, topY + h*0.2); 
+            ctx.lineTo(centerX - 10 - w, bottomY);
+            ctx.lineTo(centerX - 10, bottomY);
+            ctx.fill();
+
+            // 오른쪽 날개
+            ctx.beginPath();
+            ctx.moveTo(centerX + 10, topY);
+            ctx.lineTo(centerX + 10 + w, topY + h*0.2);
+            ctx.lineTo(centerX + 10 + w, bottomY);
+            ctx.lineTo(centerX + 10, bottomY);
+            ctx.fill();
+        });
+
+        // 3. 바디튜브
+        parts.filter(p => p.type === 'body').forEach(p => {
+            ctx.fillStyle = '#eee';
+            ctx.strokeStyle = '#999';
+            ctx.lineWidth = 2;
+            const w = p.diameter * scale;
+            const h = p.length * scale;
+            ctx.fillRect(centerX - w/2, toCanvasY(p.pos + p.length), w, h);
+            ctx.strokeRect(centerX - w/2, toCanvasY(p.pos + p.length), w, h);
+        });
+
+        // 4. 노즈콘
+        parts.filter(p => p.type === 'nosecone').forEach(p => {
+            ctx.fillStyle = '#dc3545';
+            const w = p.diameter * scale;
+            const h = p.height * scale;
+            const bottomY = toCanvasY(p.pos);
+            const topY = toCanvasY(p.pos + p.height);
+
+            ctx.beginPath();
+            ctx.moveTo(centerX - w/2, bottomY);
+            ctx.quadraticCurveTo(centerX - w/2, topY, centerX, topY);
+            ctx.quadraticCurveTo(centerX + w/2, topY, centerX + w/2, bottomY);
+            ctx.closePath();
+            ctx.fill();
+        });
+
+        // 마커 그리기 헬퍼
+        function drawMarker(y, color, label) {
+            const cy = toCanvasY(y);
+            ctx.beginPath();
+            ctx.arc(centerX, cy, 6, 0, Math.PI * 2);
+            ctx.fillStyle = color;
+            ctx.fill();
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+
+            ctx.fillStyle = color;
+            ctx.font = 'bold 12px Arial';
+            ctx.fillText(label, centerX + 15, cy + 4);
+        }
+
+        // CG 마커 (파란색)
+        if (parts.length > 0) drawMarker(cg, '#0056b3', 'CG');
+        // CP 마커 (빨간색)
+        if (parts.length > 0) drawMarker(cp, '#c82333', 'CP');
+        
+        // 0점 기준선
+        ctx.strokeStyle = '#aaa';
+        ctx.setLineDash([5, 5]);
+        ctx.beginPath();
+        ctx.moveTo(centerX - 50, baseCanvasY);
+        ctx.lineTo(centerX + 50, baseCanvasY);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = '#888';
+        ctx.fillText("0 (바디튜브 하단)", centerX + 55, baseCanvasY + 4);
     }
 </script>
 
